@@ -5,46 +5,44 @@ import (
 	"fmt"
 	"time"
 
-	"polipo"
+	"github.com/ilkamo/polipo"
 )
 
-type Fish struct {
-	Name string
+type TaskResult struct {
+	FishName string
 }
 
 func main() {
-	o := polipo.NewPolipo[Fish]()
+	p := polipo.NewPolipo[TaskResult]()
 
-	o.AddTentacle(func() ([]Fish, error) {
-		return []Fish{
-			{Name: "Salmon"},
-			{Name: "Tuna"},
-			{Name: "Trout"},
-			{Name: "Cod"},
-			{Name: "Haddock"},
-			{Name: "Mackerel"},
+	p.AddTask(func() ([]TaskResult, error) {
+		return []TaskResult{
+			{FishName: "Salmon"},
+			{FishName: "Tuna"},
+			{FishName: "Trout"},
+			{FishName: "Cod"},
 		}, nil
 	})
 
-	o.AddTentacle(func() ([]Fish, error) {
+	p.AddTask(func() ([]TaskResult, error) {
 		return nil, nil
 	})
 
-	o.AddTentacle(func() ([]Fish, error) {
-		return []Fish{
-			{Name: "Swordfish"},
-			{Name: "Marlin"},
-			{Name: "Barracuda"},
-			{Name: "Mahi Mahi"},
-			{Name: "Wahoo"},
-			{Name: "Kingfish"},
+	p.AddTask(func() ([]TaskResult, error) {
+		return []TaskResult{
+			{FishName: "Swordfish"},
+			{FishName: "Marlin"},
+			{FishName: "Barracuda"},
+			{FishName: "Mahi Mahi"},
+			{FishName: "Wahoo"},
+			{FishName: "Kingfish"},
 		}, nil
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	results, err := o.Do(ctx)
+	results, err := p.Do(ctx)
 	if err != nil {
 		panic(err) // this is just an example, don't panic in production
 	}

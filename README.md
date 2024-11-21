@@ -1,15 +1,17 @@
-# polipo
+# Polipo
 
-## Overview
+### Go library designed to manage and execute concurrent tasks using generics
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GoDoc](https://pkg.go.dev/badge/github.com/ilkamo/polipo?status.svg)](https://pkg.go.dev/github.com/ilkamo/polipo?tab=doc)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ilkamo/polipo)](https://goreportcard.com/report/ilkamo/polipo)
 
-polipo is a Go library designed to manage and execute concurrent tasks using a flexible and extensible approach. The
-library allows you to define and add multiple tasks (tentacles) to a `Polipo` instance and execute them concurrently,
-handling results and errors efficiently.
+**Polipo** library allows you to define multiple tasks and execute them concurrently, handling results and errors efficiently. For example, you can use it to fetch data from multiple sources or providers or to perform multiple calculations in parallel and combine the results into a single output.
 
-It is particularly useful when you need to execute multiple tasks concurrently and collect the results. For example, you
-can use it to fetch data from multiple sources or providers, process it concurrently, and aggregate the results into a single output.
+Unlike other similar libraries, **polipo** uses channels under the hood. No mutexes or locks are used, which makes it faster and more efficient.
 
-The name "polipo" is derived from the Italian word for "octopus," which has multiple tentacles that can perform tasks independently.
+<img src="assets/polipo.webp" width="400">
+
+The name "_polipo_" is derived from the Italian word for "_octopus_", which has multiple tentacles that can perform tasks independently. This is analogous to the library's ability to execute multiple tasks concurrently.
 
 ## Features
 
@@ -30,46 +32,50 @@ go get github.com/ilkamo/polipo
 
 ### Creating a Polipo instance
 
-To create a new `Polipo` instance, specify the type of data it will handle:
+To create a new `Polipo` instance, specify the type of data it will handle. It can be any data type, such as a struct or a primitive type:
 
 ```go
 import "github.com/ilkamo/polipo"
 
 type TaskResult struct {
-ID   int
-Name string
+    ID   int
+    Name string
 }
 
 p := polipo.NewPolipo[TaskResult]()
 ```
 
-### Adding Tentacles
+### Adding Tasks
 
-Add tentacles (tasks) to the `Polipo` instance. Each tentacle is a function that returns a slice of items and an error:
+Each task is a function that returns a slice of items and an error:
 
 ```go
-p.AddTentacle(func () ([]TaskResult, error) {
-return []TaskResult{
-{ID: 1, Name: "Task1"},
-{ID: 2, Name: "Task2"},
-}, nil
+p := polipo.NewPolipo[TaskResult]()
+
+p.AddTask(func () ([]TaskResult, error) {
+    return []TaskResult{
+        {ID: 1, Name: "Task1"},
+        {ID: 2, Name: "Task2"},
+    }, nil
 })
 ```
 
-### Run Tentacles
+### Run Tasks
 
-Run all tentacles concurrently using the `Do` method. Pass a `context.Context` to control execution:
+Run all tasks concurrently using the `Do` method. Pass a `context.Context` to control the execution:
 
 ```go
 ctx := context.TODO()
 
+p := polipo.NewPolipo[TaskResult]()
+
 results, err := p.Do(ctx)
 if err != nil {
-log.Fatal(err)
+    log.Fatal(err)
 }
 
 for _, result := range results {
-fmt.Println(result.Name)
+    fmt.Println(result.Name)
 }
 ```
 
@@ -97,14 +103,14 @@ func main() {
 	ctx := context.TODO()
 	p := polipo.NewPolipo[TaskResult]()
 
-	p.AddTentacle(func() ([]TaskResult, error) {
+	p.AddTask(func() ([]TaskResult, error) {
 		return []TaskResult{
 			{ID: 1, Name: "Task1"},
 			{ID: 2, Name: "Task2"},
 		}, nil
 	})
 
-	p.AddTentacle(func() ([]TaskResult, error) {
+	p.AddTask(func() ([]TaskResult, error) {
 		return []TaskResult{
 			{ID: 3, Name: "Task3"},
 			{ID: 4, Name: "Task4"},

@@ -6,62 +6,60 @@ import (
 	"sync"
 )
 
-// Tentacle is a function that can be run by the Polipo.
+// Task is a function that can be run by the Polipo.
 // Arguments could be passed in as a closure.
 // The function should return a slice of generic items and an error.
-type Tentacle[T any] func() ([]T, error)
+type Task[T any] func() ([]T, error)
 
-// Polipo stores a list of Tentacles to be run concurrently.
+// Polipo stores a list of Tasks to be run concurrently.
 type Polipo[T any] struct {
-	wg        sync.WaitGroup
-	tentacles []Tentacle[T]
+	tasks []Task[T]
 }
 
 // NewPolipo creates a new Polipo.
 func NewPolipo[T any]() Polipo[T] {
 	return Polipo[T]{
-		wg:        sync.WaitGroup{},
-		tentacles: make([]Tentacle[T], 0),
+		tasks: make([]Task[T], 0),
 	}
 }
 
-// AddTentacle adds a Tentacle to the Polipo. The Tentacle function will be run when Do is called.
-// Consider this as adding a function to a list of functions to be run.
-func (p *Polipo[T]) AddTentacle(tentacle Tentacle[T]) {
-	p.tentacles = append(p.tentacles, tentacle)
+// AddTask adds a Task to the Polipo. The Task function will be run when Do is called.
+func (p *Polipo[T]) AddTask(task Task[T]) {
+	p.tasks = append(p.tasks, task)
 }
 
-// Do executes all the Tentacles functions concurrently.
-// This is a blocking function that will return when all the Tentacles have finished their work.
+// Do executes all the Tasks concurrently.
+// This is a blocking function that will return when all the Tasks have finished their work.
 func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
-	if len(p.tentacles) == 0 {
-		return nil, errors.New("no tentacles to catch")
+	if len(p.tasks) == 0 {
+		return nil, errors.New("no tasks to do")
 	}
 
-	resultsChan := make(chan catchResult[T])
+	resultsChan := make(chan result[T])
+	wg := sync.WaitGroup{}
 
-	p.wg.Add(len(p.tentacles))
+	wg.Add(len(p.tasks))
 
-	for _, tentacle := range p.tentacles {
-		go func(tentacle Tentacle[T]) {
-			defer p.wg.Done()
-			items, err := tentacle()
+	for _, task := range p.tasks {
+		go func(t Task[T]) {
+			defer wg.Done()
+			items, err := t()
 
 			select {
-			case resultsChan <- catchResult[T]{items, err}:
+			case resultsChan <- result[T]{items, err}:
 			case <-ctx.Done():
 			}
-		}(tentacle)
+		}(task)
 	}
 
 	go func() {
-		p.wg.Wait()
+		wg.Wait()
 		close(resultsChan)
 	}()
 
 	var (
-		results      []T
-		polipoErrors []error
+		results []T
+		errs    []error
 	)
 
 	for {
@@ -74,21 +72,21 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 		select {
 		case res, ok := <-resultsChan:
 			if !ok {
-				return results, errors.Join(polipoErrors...)
+				return results, errors.Join(errs...)
 			}
 
 			if res.err != nil {
-				polipoErrors = append(polipoErrors, res.err)
+				errs = append(errs, res.err)
 			}
 
 			results = append(results, res.items...)
 		case <-ctx.Done():
-			return results, errors.Join(append(polipoErrors, ctx.Err())...)
+			return results, errors.Join(append(errs, ctx.Err())...)
 		}
 	}
 }
 
-type catchResult[T any] struct {
+type result[T any] struct {
 	items []T
 	err   error
 }
