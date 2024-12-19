@@ -3,6 +3,7 @@ package polipo_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -17,9 +18,33 @@ type TaskResult struct {
 
 func TestPolipo_Do(t *testing.T) {
 	t.Run("should return a list of all fishes", func(t *testing.T) {
-		ctx := context.TODO()
+		tasks := []polipo.Task[TaskResult]{
+			func() ([]TaskResult, error) {
+				return []TaskResult{
+					{FishName: "Salmon"},
+					{FishName: "Tuna"},
+					{FishName: "Trout"},
+					{FishName: "Cod"},
+					{FishName: "Haddock"},
+					{FishName: "Mackerel"},
+				}, nil
+			},
+			func() ([]TaskResult, error) {
+				return nil, nil
+			},
+			func() ([]TaskResult, error) {
+				return []TaskResult{
+					{FishName: "Swordfish"},
+					{FishName: "Marlin"},
+					{FishName: "Barracuda"},
+					{FishName: "Mahi Mahi"},
+					{FishName: "Wahoo"},
+					{FishName: "Kingfish"},
+				}, nil
+			},
+		}
 
-		expectedFishes := []TaskResult{
+		expected := []TaskResult{
 			{FishName: "Salmon"},
 			{FishName: "Tuna"},
 			{FishName: "Trout"},
@@ -34,38 +59,39 @@ func TestPolipo_Do(t *testing.T) {
 			{FishName: "Kingfish"},
 		}
 
-		p := polipo.NewPolipo[TaskResult]()
+		testCase := []struct {
+			name        string
+			concurrency int
+		}{
+			{
+				name:        "max concurrency is 1",
+				concurrency: 1,
+			},
+			{
+				name:        "max concurrency is 5",
+				concurrency: 5,
+			},
+			{
+				name:        "max concurrency is 10",
+				concurrency: 10,
+			},
+		}
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return []TaskResult{
-				{FishName: "Salmon"},
-				{FishName: "Tuna"},
-				{FishName: "Trout"},
-				{FishName: "Cod"},
-				{FishName: "Haddock"},
-				{FishName: "Mackerel"},
-			}, nil
-		})
+		for _, tc := range testCase {
+			t.Run(tc.name, func(t *testing.T) {
+				ctx := context.TODO()
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return nil, nil
-		})
+				p := polipo.NewPolipo[TaskResult]()
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return []TaskResult{
-				{FishName: "Swordfish"},
-				{FishName: "Marlin"},
-				{FishName: "Barracuda"},
-				{FishName: "Mahi Mahi"},
-				{FishName: "Wahoo"},
-				{FishName: "Kingfish"},
-			}, nil
-		})
+				for _, task := range tasks {
+					p.AddTask(task)
+				}
 
-		fishes, err := p.Do(ctx)
-		require.NoError(t, err)
-		require.Len(t, fishes, 12)
-		require.ElementsMatch(t, expectedFishes, fishes)
+				fishes, err := p.Do(ctx)
+				require.NoError(t, err)
+				require.ElementsMatch(t, expected, fishes)
+			})
+		}
 	})
 
 	t.Run("should return an error if one of the tasks returns an error", func(t *testing.T) {
@@ -139,38 +165,37 @@ func TestPolipo_Do(t *testing.T) {
 	})
 }
 
+var testCases = []struct {
+	numberOfTasks int
+}{
+	{numberOfTasks: 100},
+	{numberOfTasks: 1000},
+	{numberOfTasks: 10000},
+	{numberOfTasks: 100000},
+}
+
 func BenchmarkPolipo_Do(b *testing.B) {
-	ctx := context.TODO()
+	for _, tc := range testCases {
+		b.Run(fmt.Sprintf("%d tasks", tc.numberOfTasks), func(b *testing.B) {
+			ctx := context.TODO()
 
-	p := polipo.NewPolipo[TaskResult]()
+			p := polipo.NewPolipo[TaskResult]()
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{FishName: "Salmon"},
-			{FishName: "Tuna"},
-			{FishName: "Trout"},
-			{FishName: "Cod"},
-			{FishName: "Haddock"},
-			{FishName: "Mackerel"},
-		}, nil
-	})
+			for i := 0; i < tc.numberOfTasks; i++ {
+				p.AddTask(func() ([]TaskResult, error) {
+					return []TaskResult{
+						{FishName: "Salmon"},
+						{FishName: "Tuna"},
+						{FishName: "Trout"},
+					}, nil
+				})
+			}
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return nil, nil
-	})
+			b.ResetTimer()
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{FishName: "Swordfish"},
-			{FishName: "Marlin"},
-			{FishName: "Barracuda"},
-			{FishName: "Mahi Mahi"},
-			{FishName: "Wahoo"},
-			{FishName: "Kingfish"},
-		}, nil
-	})
-
-	for i := 0; i < b.N; i++ {
-		_, _ = p.Do(ctx)
+			for i := 0; i < b.N; i++ {
+				_, _ = p.Do(ctx)
+			}
+		})
 	}
 }
