@@ -16,7 +16,8 @@ The name "_polipo_" is derived from the Italian word for "_octopus_", which has 
 ## Features
 
 - **Generic Support**: The library uses Go generics to support any data type.
-- **Concurrent Execution**: Tasks are executed concurrently, leveraging Go's goroutines.
+- **Concurrent Execution**: Tasks are executed concurrently, leveraging Go's goroutines. The number of max concurrent tasks
+  can be controlled by using the `WithMaxConcurrency` option.
 - **Context Support**: Execution can be controlled and canceled using Go's `context.Context`.
 - **Error Handling**: Collects and returns errors from all tasks.
 
