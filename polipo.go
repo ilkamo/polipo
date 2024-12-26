@@ -12,20 +12,22 @@ const defaultMaxConcurrency = 10
 // Task is a function that can be run by the Polipo.
 // Arguments could be passed in as a closure.
 // The function should return a slice of generic items and an error.
-type Task[T any] func() ([]T, error)
+type Task[T any] func() (T, error)
 
 // Polipo stores a list of Tasks to be run concurrently.
 type Polipo[T any] struct {
-	tasks             []Task[T]
-	maxConcurrency    int
-	concurrencyBuffer chan struct{}
+	sync.RWMutex
+	tasks             []Task[T]     // tasks is a list of Tasks to be run concurrently.
+	maxConcurrency    int           // maxConcurrency is the maximum number of concurrent tasks to run.
+	concurrencyBuffer chan struct{} // concurrencyBuffer is used to limit the number of concurrent tasks.
+	processing        bool          // processing is used to prevent adding tasks while Do is running.
 }
 
 // NewPolipo creates a new Polipo. It accepts options to configure the Polipo.
 // The default maximum number of concurrent tasks is 10.
 // The options are:
 // - WithMaxConcurrency: sets the maximum number of concurrent tasks to run.
-func NewPolipo[T any](opts ...Option[T]) Polipo[T] {
+func NewPolipo[T any](opts ...Option[T]) *Polipo[T] {
 	p := Polipo[T]{
 		tasks:          make([]Task[T], 0),
 		maxConcurrency: defaultMaxConcurrency,
@@ -42,11 +44,14 @@ func NewPolipo[T any](opts ...Option[T]) Polipo[T] {
 		p.concurrencyBuffer <- struct{}{}
 	}
 
-	return p
+	return &p
 }
 
 // AddTask adds a Task to the Polipo. The Task function will be run when Do is called.
 func (p *Polipo[T]) AddTask(task Task[T]) {
+	p.Lock()
+	defer p.Unlock()
+
 	p.tasks = append(p.tasks, task)
 }
 
@@ -58,7 +63,15 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 		return nil, errors.New("no tasks to do")
 	}
 
-	resultsChan := make(chan result[T])
+	p.Lock()
+	defer func() {
+		p.processing = false
+		p.Unlock()
+	}()
+
+	p.processing = true
+
+	processedChan := make(chan processed[T])
 	wg := sync.WaitGroup{}
 
 	wg.Add(len(p.tasks))
@@ -71,10 +84,10 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 
 			go func(t Task[T]) {
 				defer wg.Done()
-				items, err := t()
+				result, err := t()
 
 				select {
-				case resultsChan <- result[T]{items, err}:
+				case processedChan <- processed[T]{result, err}:
 				case <-ctx.Done():
 				}
 
@@ -87,7 +100,7 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 	// Wait for all tasks to finish.
 	go func() {
 		wg.Wait()
-		close(resultsChan)
+		close(processedChan)
 	}()
 
 	var (
@@ -104,23 +117,23 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 		}
 
 		select {
-		case res, ok := <-resultsChan:
+		case r, ok := <-processedChan:
 			if !ok {
 				return results, errors.Join(errs...)
 			}
 
-			if res.err != nil {
-				errs = append(errs, res.err)
+			if r.err != nil {
+				errs = append(errs, r.err)
 			}
 
-			results = append(results, res.items...)
+			results = append(results, r.result)
 		case <-ctx.Done():
 			return results, errors.Join(append(errs, ctx.Err())...)
 		}
 	}
 }
 
-type result[T any] struct {
-	items []T
-	err   error
+type processed[T any] struct {
+	result T
+	err    error
 }

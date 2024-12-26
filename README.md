@@ -53,11 +53,8 @@ Each task is a function that returns a slice of items and an error:
 ```go
 p := polipo.NewPolipo[TaskResult]()
 
-p.AddTask(func () ([]TaskResult, error) {
-    return []TaskResult{
-        {ID: 1, Name: "Task1"},
-        {ID: 2, Name: "Task2"},
-    }, nil
+err := p.AddTask(func () (TaskResult, error) {
+    return TaskResult{ID: 1, Name: "Task1"}, nil
 })
 ```
 
@@ -104,19 +101,13 @@ func main() {
 	ctx := context.TODO()
 	p := polipo.NewPolipo[TaskResult]()
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{ID: 1, Name: "Task1"},
-			{ID: 2, Name: "Task2"},
-		}, nil
-	})
+    p.AddTask(func() (TaskResult, error) {
+      return TaskResult{ID: 1, Name: "Task1"}, nil
+    })
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{ID: 3, Name: "Task3"},
-			{ID: 4, Name: "Task4"},
-		}, nil
-	})
+    p.AddTask(func() (TaskResult, error) {
+      return TaskResult{ID: 2, Name: "Task2"}, nil
+    })
 
 	results, err := p.Do(ctx)
 	if err != nil {

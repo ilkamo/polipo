@@ -9,33 +9,37 @@ import (
 )
 
 type TaskResult struct {
-	FishName string
+	Fishes []string
 }
 
 func main() {
 	p := polipo.NewPolipo[TaskResult]()
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{FishName: "Salmon"},
-			{FishName: "Tuna"},
-			{FishName: "Trout"},
-			{FishName: "Cod"},
+	p.AddTask(func() (TaskResult, error) {
+		return TaskResult{
+			Fishes: []string{
+				"Salmon",
+				"Tuna",
+				"Trout",
+				"Cod",
+			},
 		}, nil
 	})
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return nil, nil
+	p.AddTask(func() (TaskResult, error) {
+		return TaskResult{}, nil
 	})
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{FishName: "Swordfish"},
-			{FishName: "Marlin"},
-			{FishName: "Barracuda"},
-			{FishName: "Mahi Mahi"},
-			{FishName: "Wahoo"},
-			{FishName: "Kingfish"},
+	p.AddTask(func() (TaskResult, error) {
+		return TaskResult{
+			Fishes: []string{
+				"Swordfish",
+				"Marlin",
+				"Barracuda",
+				"Mahi Mahi",
+				"Wahoo",
+				"Kingfish",
+			},
 		}, nil
 	})
 

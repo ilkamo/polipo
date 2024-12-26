@@ -13,50 +13,65 @@ import (
 )
 
 type TaskResult struct {
-	FishName string
+	Fishes []string
 }
 
 func TestPolipo_Do(t *testing.T) {
-	t.Run("should return a list of all fishes", func(t *testing.T) {
+	t.Run("should return all fishes", func(t *testing.T) {
 		tasks := []polipo.Task[TaskResult]{
-			func() ([]TaskResult, error) {
-				return []TaskResult{
-					{FishName: "Salmon"},
-					{FishName: "Tuna"},
-					{FishName: "Trout"},
-					{FishName: "Cod"},
-					{FishName: "Haddock"},
-					{FishName: "Mackerel"},
+			func() (TaskResult, error) {
+				return TaskResult{
+					Fishes: []string{
+						"Salmon",
+						"Tuna",
+						"Trout",
+						"Cod",
+						"Haddock",
+						"Mackerel",
+					},
 				}, nil
 			},
-			func() ([]TaskResult, error) {
-				return nil, nil
+			func() (TaskResult, error) {
+				return TaskResult{}, nil
 			},
-			func() ([]TaskResult, error) {
-				return []TaskResult{
-					{FishName: "Swordfish"},
-					{FishName: "Marlin"},
-					{FishName: "Barracuda"},
-					{FishName: "Mahi Mahi"},
-					{FishName: "Wahoo"},
-					{FishName: "Kingfish"},
+			func() (TaskResult, error) {
+				return TaskResult{
+					Fishes: []string{
+						"Swordfish",
+						"Marlin",
+						"Barracuda",
+						"Mahi Mahi",
+						"Wahoo",
+						"Kingfish",
+					},
 				}, nil
 			},
 		}
 
 		expected := []TaskResult{
-			{FishName: "Salmon"},
-			{FishName: "Tuna"},
-			{FishName: "Trout"},
-			{FishName: "Cod"},
-			{FishName: "Haddock"},
-			{FishName: "Mackerel"},
-			{FishName: "Swordfish"},
-			{FishName: "Marlin"},
-			{FishName: "Barracuda"},
-			{FishName: "Mahi Mahi"},
-			{FishName: "Wahoo"},
-			{FishName: "Kingfish"},
+			{
+				Fishes: []string{
+					"Salmon",
+					"Tuna",
+					"Trout",
+					"Cod",
+					"Haddock",
+					"Mackerel",
+				},
+			},
+			{
+				Fishes: nil,
+			},
+			{
+				Fishes: []string{
+					"Swordfish",
+					"Marlin",
+					"Barracuda",
+					"Mahi Mahi",
+					"Wahoo",
+					"Kingfish",
+				},
+			},
 		}
 
 		testCase := []struct {
@@ -87,9 +102,9 @@ func TestPolipo_Do(t *testing.T) {
 					p.AddTask(task)
 				}
 
-				fishes, err := p.Do(ctx)
+				allResults, err := p.Do(ctx)
 				require.NoError(t, err)
-				require.ElementsMatch(t, expected, fishes)
+				require.ElementsMatch(t, expected, allResults)
 			})
 		}
 	})
@@ -99,24 +114,33 @@ func TestPolipo_Do(t *testing.T) {
 
 		p := polipo.NewPolipo[TaskResult]()
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return []TaskResult{
-				{FishName: "Swordfish"},
-				{FishName: "Marlin"},
+		p.AddTask(func() (TaskResult, error) {
+			return TaskResult{
+				Fishes: []string{
+					"Swordfish",
+					"Marlin",
+				},
 			}, nil
 		})
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return nil, errors.New("nothing in the ocean")
+		p.AddTask(func() (TaskResult, error) {
+			return TaskResult{}, errors.New("nothing in the ocean")
 		})
 
-		fishes, err := p.Do(ctx)
+		allResults, err := p.Do(ctx)
 		require.ErrorContains(t, err, "nothing in the ocean")
-		require.Len(t, fishes, 2)
+		require.Len(t, allResults, 2)
 		require.ElementsMatch(t, []TaskResult{
-			{FishName: "Swordfish"},
-			{FishName: "Marlin"},
-		}, fishes)
+			{
+				Fishes: []string{
+					"Swordfish",
+					"Marlin",
+				},
+			},
+			{
+				Fishes: nil,
+			},
+		}, allResults)
 	})
 
 	t.Run("should return an error if the context is canceled", func(t *testing.T) {
@@ -124,18 +148,20 @@ func TestPolipo_Do(t *testing.T) {
 
 		p := polipo.NewPolipo[TaskResult]()
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return []TaskResult{
-				{FishName: "Swordfish"},
-				{FishName: "Marlin"},
+		p.AddTask(func() (TaskResult, error) {
+			return TaskResult{
+				Fishes: []string{
+					"Swordfish",
+					"Marlin",
+				},
 			}, nil
 		})
 
 		cancel()
 
-		fishes, err := p.Do(ctx)
+		allResults, err := p.Do(ctx)
 		require.ErrorContains(t, err, "context canceled")
-		require.Empty(t, fishes)
+		require.Empty(t, allResults)
 	})
 
 	t.Run("should return an error if the context is canceled because of timeout", func(t *testing.T) {
@@ -144,24 +170,36 @@ func TestPolipo_Do(t *testing.T) {
 
 		p := polipo.NewPolipo[TaskResult]()
 
-		p.AddTask(func() ([]TaskResult, error) {
-			return []TaskResult{
-				{FishName: "Swordfish"},
+		p.AddTask(func() (TaskResult, error) {
+			return TaskResult{
+				Fishes: []string{"Swordfish"},
 			}, nil
 		})
 
-		p.AddTask(func() ([]TaskResult, error) {
+		p.AddTask(func() (TaskResult, error) {
 			time.Sleep(time.Second * 10)
-			return []TaskResult{
-				{FishName: "Marlin"},
+			return TaskResult{
+				Fishes: []string{"Marlin"},
 			}, nil
 		})
 
-		fishes, err := p.Do(ctx)
+		allResults, err := p.Do(ctx)
 		require.ErrorContains(t, err, "context deadline exceeded")
 		require.ElementsMatch(t, []TaskResult{
-			{FishName: "Swordfish"},
-		}, fishes)
+			{
+				Fishes: []string{"Swordfish"},
+			},
+		}, allResults)
+	})
+
+	t.Run("should return an error if no tasks to do", func(t *testing.T) {
+		ctx := context.TODO()
+
+		p := polipo.NewPolipo[TaskResult]()
+
+		allResults, err := p.Do(ctx)
+		require.ErrorContains(t, err, "no tasks to do")
+		require.Empty(t, allResults)
 	})
 }
 
@@ -182,11 +220,13 @@ func BenchmarkPolipo_Do(b *testing.B) {
 			p := polipo.NewPolipo[TaskResult]()
 
 			for i := 0; i < tc.numberOfTasks; i++ {
-				p.AddTask(func() ([]TaskResult, error) {
-					return []TaskResult{
-						{FishName: "Salmon"},
-						{FishName: "Tuna"},
-						{FishName: "Trout"},
+				p.AddTask(func() (TaskResult, error) {
+					return TaskResult{
+						Fishes: []string{
+							"Salmon",
+							"Tuna",
+							"Trout",
+						},
 					}, nil
 				})
 			}
