@@ -99,8 +99,7 @@ func TestPolipo_Do(t *testing.T) {
 				p := polipo.NewPolipo[TaskResult]()
 
 				for _, task := range tasks {
-					err := p.AddTask(task)
-					require.NoError(t, err)
+					p.AddTask(task)
 				}
 
 				allResults, err := p.Do(ctx)
@@ -115,7 +114,7 @@ func TestPolipo_Do(t *testing.T) {
 
 		p := polipo.NewPolipo[TaskResult]()
 
-		err := p.AddTask(func() (TaskResult, error) {
+		p.AddTask(func() (TaskResult, error) {
 			return TaskResult{
 				Fishes: []string{
 					"Swordfish",
@@ -123,12 +122,10 @@ func TestPolipo_Do(t *testing.T) {
 				},
 			}, nil
 		})
-		require.NoError(t, err)
 
-		err = p.AddTask(func() (TaskResult, error) {
+		p.AddTask(func() (TaskResult, error) {
 			return TaskResult{}, errors.New("nothing in the ocean")
 		})
-		require.NoError(t, err)
 
 		allResults, err := p.Do(ctx)
 		require.ErrorContains(t, err, "nothing in the ocean")
@@ -151,7 +148,7 @@ func TestPolipo_Do(t *testing.T) {
 
 		p := polipo.NewPolipo[TaskResult]()
 
-		err := p.AddTask(func() (TaskResult, error) {
+		p.AddTask(func() (TaskResult, error) {
 			return TaskResult{
 				Fishes: []string{
 					"Swordfish",
@@ -159,7 +156,6 @@ func TestPolipo_Do(t *testing.T) {
 				},
 			}, nil
 		})
-		require.NoError(t, err)
 
 		cancel()
 
@@ -174,20 +170,18 @@ func TestPolipo_Do(t *testing.T) {
 
 		p := polipo.NewPolipo[TaskResult]()
 
-		err := p.AddTask(func() (TaskResult, error) {
+		p.AddTask(func() (TaskResult, error) {
 			return TaskResult{
 				Fishes: []string{"Swordfish"},
 			}, nil
 		})
-		require.NoError(t, err)
 
-		err = p.AddTask(func() (TaskResult, error) {
+		p.AddTask(func() (TaskResult, error) {
 			time.Sleep(time.Second * 10)
 			return TaskResult{
 				Fishes: []string{"Marlin"},
 			}, nil
 		})
-		require.NoError(t, err)
 
 		allResults, err := p.Do(ctx)
 		require.ErrorContains(t, err, "context deadline exceeded")
@@ -196,35 +190,6 @@ func TestPolipo_Do(t *testing.T) {
 				Fishes: []string{"Swordfish"},
 			},
 		}, allResults)
-	})
-
-	t.Run("adding tasks should return an error if already processing", func(t *testing.T) {
-		ctx := context.TODO()
-
-		p := polipo.NewPolipo[TaskResult]()
-
-		err := p.AddTask(func() (TaskResult, error) {
-			time.Sleep(time.Second)
-
-			return TaskResult{}, nil
-		})
-		require.NoError(t, err)
-
-		go func() {
-			_, _ = p.Do(ctx)
-		}()
-
-		time.Sleep(time.Millisecond * 100)
-
-		err = p.AddTask(func() (TaskResult, error) {
-			return TaskResult{
-				Fishes: []string{
-					"Salmon",
-					"Tuna",
-				},
-			}, nil
-		})
-		require.ErrorContains(t, err, "cannot add tasks while processing")
 	})
 
 	t.Run("should return an error if no tasks to do", func(t *testing.T) {
@@ -255,7 +220,7 @@ func BenchmarkPolipo_Do(b *testing.B) {
 			p := polipo.NewPolipo[TaskResult]()
 
 			for i := 0; i < tc.numberOfTasks; i++ {
-				err := p.AddTask(func() (TaskResult, error) {
+				p.AddTask(func() (TaskResult, error) {
 					return TaskResult{
 						Fishes: []string{
 							"Salmon",
@@ -264,7 +229,6 @@ func BenchmarkPolipo_Do(b *testing.B) {
 						},
 					}, nil
 				})
-				require.NoError(b, err)
 			}
 
 			b.ResetTimer()

@@ -48,17 +48,11 @@ func NewPolipo[T any](opts ...Option[T]) *Polipo[T] {
 }
 
 // AddTask adds a Task to the Polipo. The Task function will be run when Do is called.
-func (p *Polipo[T]) AddTask(task Task[T]) error {
-	if p.processing {
-		return errors.New("cannot add tasks while processing")
-	}
-
+func (p *Polipo[T]) AddTask(task Task[T]) {
 	p.Lock()
 	defer p.Unlock()
 
 	p.tasks = append(p.tasks, task)
-
-	return nil
 }
 
 // Do executes all the Tasks concurrently. It limits the number of concurrent tasks to the value
@@ -67,10 +61,6 @@ func (p *Polipo[T]) AddTask(task Task[T]) error {
 func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 	if len(p.tasks) == 0 {
 		return nil, errors.New("no tasks to do")
-	}
-
-	if p.processing {
-		return nil, errors.New("already processing tasks")
 	}
 
 	p.Lock()
