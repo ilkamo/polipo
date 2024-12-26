@@ -132,13 +132,16 @@ func TestPolipo_Do(t *testing.T) {
 
 		allResults, err := p.Do(ctx)
 		require.ErrorContains(t, err, "nothing in the ocean")
-		require.Len(t, allResults, 1)
+		require.Len(t, allResults, 2)
 		require.ElementsMatch(t, []TaskResult{
 			{
 				Fishes: []string{
 					"Swordfish",
 					"Marlin",
 				},
+			},
+			{
+				Fishes: nil,
 			},
 		}, allResults)
 	})
@@ -193,6 +196,45 @@ func TestPolipo_Do(t *testing.T) {
 				Fishes: []string{"Swordfish"},
 			},
 		}, allResults)
+	})
+
+	t.Run("adding tasks should return an error if already processing", func(t *testing.T) {
+		ctx := context.TODO()
+
+		p := polipo.NewPolipo[TaskResult]()
+
+		err := p.AddTask(func() (TaskResult, error) {
+			time.Sleep(time.Second)
+
+			return TaskResult{}, nil
+		})
+		require.NoError(t, err)
+
+		go func() {
+			_, _ = p.Do(ctx)
+		}()
+
+		time.Sleep(time.Millisecond * 100)
+
+		err = p.AddTask(func() (TaskResult, error) {
+			return TaskResult{
+				Fishes: []string{
+					"Salmon",
+					"Tuna",
+				},
+			}, nil
+		})
+		require.ErrorContains(t, err, "cannot add tasks while processing")
+	})
+
+	t.Run("should return an error if no tasks to do", func(t *testing.T) {
+		ctx := context.TODO()
+
+		p := polipo.NewPolipo[TaskResult]()
+
+		allResults, err := p.Do(ctx)
+		require.ErrorContains(t, err, "no tasks to do")
+		require.Empty(t, allResults)
 	})
 }
 
