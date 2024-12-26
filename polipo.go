@@ -12,20 +12,22 @@ const defaultMaxConcurrency = 10
 // Task is a function that can be run by the Polipo.
 // Arguments could be passed in as a closure.
 // The function should return a slice of generic items and an error.
-type Task[T any] func() ([]T, error)
+type Task[T any] func() (T, error)
 
 // Polipo stores a list of Tasks to be run concurrently.
 type Polipo[T any] struct {
+	sync.RWMutex
 	tasks             []Task[T]
 	maxConcurrency    int
 	concurrencyBuffer chan struct{}
+	processing        bool // processing is used to prevent adding tasks while Do is running.
 }
 
 // NewPolipo creates a new Polipo. It accepts options to configure the Polipo.
 // The default maximum number of concurrent tasks is 10.
 // The options are:
 // - WithMaxConcurrency: sets the maximum number of concurrent tasks to run.
-func NewPolipo[T any](opts ...Option[T]) Polipo[T] {
+func NewPolipo[T any](opts ...Option[T]) *Polipo[T] {
 	p := Polipo[T]{
 		tasks:          make([]Task[T], 0),
 		maxConcurrency: defaultMaxConcurrency,
@@ -42,18 +44,39 @@ func NewPolipo[T any](opts ...Option[T]) Polipo[T] {
 		p.concurrencyBuffer <- struct{}{}
 	}
 
-	return p
+	return &p
 }
 
 // AddTask adds a Task to the Polipo. The Task function will be run when Do is called.
-func (p *Polipo[T]) AddTask(task Task[T]) {
+func (p *Polipo[T]) AddTask(task Task[T]) error {
+	if p.processing {
+		return errors.New("cannot add tasks while processing")
+	}
+
+	p.Lock()
+	defer p.Unlock()
+
 	p.tasks = append(p.tasks, task)
+
+	return nil
 }
 
 // Do executes all the Tasks concurrently. It limits the number of concurrent tasks to the value
 // set by passing `WithMaxConcurrency` as an option. The default is 10.
 // This is a blocking function that will return when all the Tasks have finished their work.
 func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
+	if p.processing {
+		return nil, errors.New("already processing tasks")
+	}
+
+	p.Lock()
+	defer func() {
+		p.processing = false
+		p.Unlock()
+	}()
+
+	p.processing = true
+
 	if len(p.tasks) == 0 {
 		return nil, errors.New("no tasks to do")
 	}
@@ -111,9 +134,10 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 
 			if res.err != nil {
 				errs = append(errs, res.err)
+				continue
 			}
 
-			results = append(results, res.items...)
+			results = append(results, res.resp)
 		case <-ctx.Done():
 			return results, errors.Join(append(errs, ctx.Err())...)
 		}
@@ -121,6 +145,6 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 }
 
 type result[T any] struct {
-	items []T
-	err   error
+	resp T
+	err  error
 }
