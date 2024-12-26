@@ -9,35 +9,45 @@ import (
 )
 
 type TaskResult struct {
-	FishName string
+	Fishes []string
 }
 
 func main() {
 	p := polipo.NewPolipo[TaskResult]()
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{FishName: "Salmon"},
-			{FishName: "Tuna"},
-			{FishName: "Trout"},
-			{FishName: "Cod"},
+	if err := p.AddTask(func() (TaskResult, error) {
+		return TaskResult{
+			Fishes: []string{
+				"Salmon",
+				"Tuna",
+				"Trout",
+				"Cod",
+			},
 		}, nil
-	})
+	}); err != nil {
+		panic(err) // this is just an example, don't panic in production
+	}
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return nil, nil
-	})
+	if err := p.AddTask(func() (TaskResult, error) {
+		return TaskResult{}, nil
+	}); err != nil {
+		panic(err)
+	}
 
-	p.AddTask(func() ([]TaskResult, error) {
-		return []TaskResult{
-			{FishName: "Swordfish"},
-			{FishName: "Marlin"},
-			{FishName: "Barracuda"},
-			{FishName: "Mahi Mahi"},
-			{FishName: "Wahoo"},
-			{FishName: "Kingfish"},
+	if err := p.AddTask(func() (TaskResult, error) {
+		return TaskResult{
+			Fishes: []string{
+				"Swordfish",
+				"Marlin",
+				"Barracuda",
+				"Mahi Mahi",
+				"Wahoo",
+				"Kingfish",
+			},
 		}, nil
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
