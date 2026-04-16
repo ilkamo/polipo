@@ -20,7 +20,6 @@ type Polipo[T any] struct {
 	tasks             []Task[T]     // tasks is a list of Tasks to be run concurrently.
 	maxConcurrency    int           // maxConcurrency is the maximum number of concurrent tasks to run.
 	concurrencyBuffer chan struct{} // concurrencyBuffer is used to limit the number of concurrent tasks.
-	processing        bool          // processing is used to prevent adding tasks while Do is running.
 }
 
 // NewPolipo creates a new Polipo. It accepts options to configure the Polipo.
@@ -35,6 +34,10 @@ func NewPolipo[T any](opts ...Option[T]) *Polipo[T] {
 
 	for _, opt := range opts {
 		opt(&p)
+	}
+
+	if p.maxConcurrency < 1 {
+		p.maxConcurrency = 1
 	}
 
 	p.concurrencyBuffer = make(chan struct{}, p.maxConcurrency)
@@ -59,28 +62,30 @@ func (p *Polipo[T]) AddTask(task Task[T]) {
 // set by passing `WithMaxConcurrency` as an option. The default is 10.
 // This is a blocking function that will return when all the Tasks have finished their work.
 func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
+	p.Lock()
+	defer p.Unlock()
+
 	if len(p.tasks) == 0 {
 		return nil, errors.New("no tasks to do")
 	}
 
-	p.Lock()
-	defer func() {
-		p.processing = false
-		p.Unlock()
-	}()
-
-	p.processing = true
-
 	processedChan := make(chan processed[T])
 	wg := sync.WaitGroup{}
-
-	wg.Add(len(p.tasks))
+	schedulerDone := make(chan struct{})
 
 	// Schedule tasks to run concurrently limiting the number of concurrent tasks.
 	go func() {
+		defer close(schedulerDone)
+
 		for _, task := range p.tasks {
-			// Wait for an available slot in the concurrencyBuffer.
-			<-p.concurrencyBuffer
+			// Wait for an available slot or context cancellation.
+			select {
+			case <-p.concurrencyBuffer:
+			case <-ctx.Done():
+				return
+			}
+
+			wg.Add(1)
 
 			go func(t Task[T]) {
 				defer wg.Done()
@@ -97,8 +102,9 @@ func (p *Polipo[T]) Do(ctx context.Context) ([]T, error) {
 		}
 	}()
 
-	// Wait for all tasks to finish.
+	// Wait for all launched tasks to finish.
 	go func() {
+		<-schedulerDone
 		wg.Wait()
 		close(processedChan)
 	}()
