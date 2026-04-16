@@ -16,4 +16,18 @@ func TestWithMaxConcurrency(t *testing.T) {
 		)
 		require.Equal(t, maxConcurrency, p.maxConcurrency)
 	})
+
+	t.Run("should clamp zero to 1", func(t *testing.T) {
+		p := NewPolipo[result](
+			WithMaxConcurrency[result](0),
+		)
+		require.Equal(t, 1, p.maxConcurrency)
+	})
+
+	t.Run("should clamp negative to 1", func(t *testing.T) {
+		p := NewPolipo[result](
+			WithMaxConcurrency[result](-5),
+		)
+		require.Equal(t, 1, p.maxConcurrency)
+	})
 }

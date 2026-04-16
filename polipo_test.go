@@ -96,7 +96,9 @@ func TestPolipo_Do(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				ctx := context.TODO()
 
-				p := polipo.NewPolipo[TaskResult]()
+				p := polipo.NewPolipo[TaskResult](
+					polipo.WithMaxConcurrency[TaskResult](tc.concurrency),
+				)
 
 				for _, task := range tasks {
 					p.AddTask(task)
