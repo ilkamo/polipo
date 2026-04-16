@@ -1,6 +1,6 @@
 module github.com/ilkamo/polipo
 
-go 1.23
+go 1.26.2
 
 require github.com/stretchr/testify v1.9.0
 
